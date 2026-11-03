@@ -1,0 +1,25 @@
+DNA Sequence Matcher
+====================
+
+`dna_matcher.py` searches every overlapping section of the DNA sequences in
+the sibling `test` folder. Each candidate section has the same length as the
+query sequence. Candidates with at least 80% matching bases are printed from
+the highest match percentage to the lowest.
+
+Run the program from the repository's top-level folder and provide the query
+sequence and DNA text file as arguments:
+
+    python day03\dna_matcher.py ACGT day03\test\dna.txt
+
+If the file argument is omitted, the program searches all `.txt` files in
+`day03\test`:
+
+    python day03\dna_matcher.py ACGT
+
+For each candidate, the program prints its match percentage and its
+one-based inclusive start and end positions in the file. Differences are
+shown as the position and the change from the query base to the candidate
+base.
+
+The `run_tests(query)` function reads each `.txt` file in `day03\test` and
+searches it using the provided query sequence.
