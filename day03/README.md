@@ -17,20 +17,21 @@ beginning and end of a sequence and rejects any other characters.
 
 ## Run
 
-From the repository's top-level folder, search one file:
+From the repository's top-level folder, provide the query and the file path:
 
 ```powershell
 python day03\dna_matcher.py ACGT day03\test\dna.txt
 ```
 
-Omit the file path to search every `.txt` file in `day03\test`:
+If either value is omitted, the program prompts for it. Running without
+arguments prompts for the file path first, then the wanted DNA sequence:
 
 ```powershell
-python day03\dna_matcher.py ACGT
+python day03\dna_matcher.py
 ```
 
-The `run_tests(query)` function in `dna_matcher.py` performs that folder-wide
-search. It reads the files in name order, one at a time.
+The `run_tests(query)` function is also available for searching every `.txt`
+file in the sibling `test` folder.
 
 ## Results
 

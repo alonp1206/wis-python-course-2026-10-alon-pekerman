@@ -11,10 +11,11 @@ sequence and DNA text file as arguments:
 
     python day03\dna_matcher.py ACGT day03\test\dna.txt
 
-If the file argument is omitted, the program searches all `.txt` files in
-`day03\test`:
+If either argument is omitted, the program prompts for that value. Running
+without arguments prompts for the file path first, then the wanted DNA
+sequence:
 
-    python day03\dna_matcher.py ACGT
+    python day03\dna_matcher.py
 
 For each candidate, the program prints its match percentage and its
 one-based inclusive start and end positions in the file. Differences are

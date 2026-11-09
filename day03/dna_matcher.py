@@ -1,74 +1,95 @@
 import argparse
-import re
+from dataclasses import dataclass
 from pathlib import Path
+import re
+
+MINIMUM_MATCH_PERCENT = 80.0
+DNA_PATTERN = re.compile(r"^[ACGT]+$")
 
 
-MINIMUM_MATCH_PERCENT = 80
-DNA_PATTERN = re.compile(r"[ACGT]+", re.IGNORECASE)
+@dataclass(frozen=True)
+class Difference:
+    position: int
+    expected: str
+    actual: str
+
+
+@dataclass(frozen=True)
+class Match:
+    start: int
+    end: int
+    candidate: str
+    match_percent: float
+    differences: list[Difference]
 
 
 def validate_dna(sequence: str, description: str) -> str:
-    sequence = sequence.strip()
-    if not DNA_PATTERN.fullmatch(sequence):
+    # הסרת כל הרווחים, הטאבים וירידות השורה בתוך הרצף
+    clean_sequence = re.sub(r"\s+", "", sequence).upper()
+    if not clean_sequence or not DNA_PATTERN.match(clean_sequence):
         raise ValueError(f"{description} must contain only A, C, G, and T")
-    return sequence.upper()
+    return clean_sequence
 
 
-def find_matches(
-    sequence: str, query: str
-) -> list[tuple[int, str, float, list[tuple[int, str, str]]]]:
-    sequence = validate_dna(sequence, "The DNA sequence")
-    query = validate_dna(query, "The query sequence")
-    if len(query) > len(sequence):
+def find_matches(sequence: str, query: str) -> list[Match]:
+    clean_seq = validate_dna(sequence, "The DNA sequence")
+    clean_query = validate_dna(query, "The query sequence")
+
+    q_len = len(clean_query)
+    s_len = len(clean_seq)
+    if q_len > s_len:
         return []
 
-    candidates = re.finditer(rf"(?=([ACGT]{{{len(query)}}}))", sequence)
-    matches = []
-    for candidate in candidates:
-        window = candidate.group(1)
-        differences = [
-            (candidate.start() + index + 1, expected, actual)
-            for index, (expected, actual) in enumerate(zip(query, window))
-            if expected != actual
-        ]
-        match_percent = (len(query) - len(differences)) / len(query) * 100
-        if match_percent >= MINIMUM_MATCH_PERCENT:
-            matches.append((candidate.start() + 1, window, match_percent, differences))
+    max_allowed_mismatches = int(q_len * (1 - MINIMUM_MATCH_PERCENT / 100))
+    matches: list[Match] = []
 
-    return sorted(matches, key=lambda match: (-match[2], match[0]))
+    # Sliding window פשוט ומהיר
+    for i in range(s_len - q_len + 1):
+        window = clean_seq[i : i + q_len]
+
+        differences: list[Difference] = []
+        mismatch_count = 0
+
+        for offset, (expected, actual) in enumerate(zip(clean_query, window)):
+            if expected != actual:
+                mismatch_count += 1
+                if mismatch_count > max_allowed_mismatches:
+                    break
+                differences.append(Difference(i + offset + 1, expected, actual))
+        else:
+            match_percent = (q_len - mismatch_count) / q_len * 100
+            matches.append(
+                Match(
+                    start=i + 1,
+                    end=i + q_len,
+                    candidate=window,
+                    match_percent=match_percent,
+                    differences=differences,
+                )
+            )
+
+    return sorted(matches, key=lambda m: (-m.match_percent, m.start))
 
 
 def print_matches(source_name: str, sequence: str, query: str) -> None:
     matches = find_matches(sequence, query)
     print(f"\n{source_name}:")
     if not matches:
-        print(f"No candidates matched at least {MINIMUM_MATCH_PERCENT}%")
+        print(f"No candidates matched at least {MINIMUM_MATCH_PERCENT:g}%")
         return
 
-    for index, (start, candidate, match_percent, differences) in enumerate(matches):
+    for index, match in enumerate(matches):
         label = "best match" if index == 0 else "match"
-        end = start + len(query) - 1
         print(
-            f"{label}: {match_percent:g}% match. starts at position: {start} "
-            f"and ends at position: {end}. candidate: {candidate}"
+            f"{label}: {match.match_percent:g}% match. starts at position: {match.start} "
+            f"and ends at position: {match.end}. candidate: {match.candidate}"
         )
-        if differences:
+        if match.differences:
             changes = ", ".join(
-                f"position {position}: {expected} -> {actual}"
-                for position, expected, actual in differences
+                f"position {diff.position}: {diff.expected} -> {diff.actual}"
+                for diff in match.differences
             )
             print(f"  changes: {changes}")
-
-
-def run_tests(query: str) -> None:
-    test_folder = Path(__file__).parent / "test"
-    test_files = sorted(test_folder.glob("*.txt"))
-    if not test_files:
-        raise FileNotFoundError(f"No .txt files found in {test_folder}")
-
-    for test_file in test_files:
-        sequence = test_file.read_text(encoding="utf-8")
-        print_matches(test_file.name, sequence, query)
 
 
 def main() -> None:
@@ -77,24 +98,30 @@ def main() -> None:
     )
     parser.add_argument(
         "query",
+        nargs="?",
         help="DNA sequence to search for (candidates are the same length)",
     )
     parser.add_argument(
         "input_file",
         nargs="?",
         type=Path,
-        help="DNA text file to search (searches the test folder if omitted)",
+        help="DNA text file to search (prompted for if omitted)",
     )
     args = parser.parse_args()
 
     try:
-        if args.input_file is None:
-            run_tests(args.query)
-        else:
-            sequence = args.input_file.read_text(encoding="utf-8")
-            print_matches(args.input_file.name, sequence, args.query)
+        input_file = args.input_file or Path(input("DNA file path: ").strip())
+        query = args.query or input("Wanted DNA sequence: ")
+
+        sequence = input_file.read_text(encoding="utf-8")
+        print_matches(input_file.name, sequence, query)
     except (OSError, ValueError) as error:
         parser.error(str(error))
+
+    user_input = input("DO you want to try another Sequence or DNA? (press Enter to exit press Y to continue): ")
+    user_input = user_input.strip().lower()
+    if user_input == "Y" or user_input == "y":
+        main()
 
 
 if __name__ == "__main__":
