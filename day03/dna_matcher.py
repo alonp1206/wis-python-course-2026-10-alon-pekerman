@@ -1,4 +1,5 @@
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -92,6 +93,31 @@ def print_matches(source_name: str, sequence: str, query: str) -> None:
             print(f"  changes: {changes}")
 
 
+def run_tests(query: str, test_dir: Path | None = None) -> list[tuple[str, list[Match]]]:
+    if test_dir is None:
+        test_dir = Path(__file__).resolve().parent / "test"
+
+    if not test_dir.exists():
+        raise FileNotFoundError(f"Test directory not found: {test_dir}")
+
+    results: list[tuple[str, list[Match]]] = []
+    for file_path in sorted(test_dir.glob("*.txt")):
+        sequence = file_path.read_text(encoding="utf-8")
+        matches = find_matches(sequence, query)
+        results.append((file_path.name, matches))
+        print_matches(file_path.name, sequence, query)
+
+    return results
+
+
+def _read_required_input(prompt: str, value: str | None) -> str:
+    if value is not None:
+        return value.strip()
+    if not sys.stdin.isatty():
+        raise ValueError(f"{prompt} is required when stdin is not interactive.")
+    return input(prompt).strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Find DNA subsequences similar to a query sequence."
@@ -110,17 +136,28 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        input_file = args.input_file or Path(input("DNA file path: ").strip())
-        query = args.query or input("Wanted DNA sequence: ")
+        query = _read_required_input("Wanted DNA sequence: ", args.query)
+        input_file = args.input_file or Path(
+            _read_required_input("DNA file path: ", None)
+        )
 
         sequence = input_file.read_text(encoding="utf-8")
         print_matches(input_file.name, sequence, query)
     except (OSError, ValueError) as error:
         parser.error(str(error))
 
-    user_input = input("DO you want to try another Sequence or DNA? (press Enter to exit press Y to continue): ")
+    if not sys.stdin.isatty():
+        return
+
+    try:
+        user_input = input(
+            "Do you want to try another sequence or DNA? (press Enter to exit or Y to continue): "
+        )
+    except EOFError:
+        return
+
     user_input = user_input.strip().lower()
-    if user_input == "Y" or user_input == "y":
+    if user_input in {"y", "yes"}:
         main()
 
 

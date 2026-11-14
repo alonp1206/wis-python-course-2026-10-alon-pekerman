@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Step 2: Filter Lowly Expressed Genes</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">Data uploaded successfully. Define the threshold to filter out background noise.</p>
+                <form action="/filter" method="POST">
+                    <div class="mb-4">
+                        <label for="min_count" class="form-label fw-bold">Minimum Total Count</label>
+                        <input type="number" class="form-control" id="min_count" name="min_count" value="10" min="0" required>
+                        <div class="form-text">Genes with a sum of counts across all samples below this threshold will be removed.</div>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 py-2">Filter Data & Run PCA</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

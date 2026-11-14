@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body text-center p-4">
+                {% if message %}
+                    <div class="alert alert-secondary">{{ message }}</div>
+                {% endif %}
+                
+                {% if plot %}
+                    <img src="{{ url_for('static', filename=plot) }}" class="img-fluid border rounded shadow-sm mb-4" alt="Result Plot">
+                {% else %}
+                    <div class="alert alert-danger">Plot could not be generated. Please check your data or parameters.</div>
+                {% endif %}
+                
+                {% if table_data %}
+                    <div class="table-responsive mb-4 mt-3">
+                        <table class="table table-bordered table-striped text-start">
+                            <thead class="table-dark">
+                                <tr>
+                                    {% for key in table_data[0].keys() %}
+                                        <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in table_data %}
+                                    <tr>
+                                        {% for value in row.values() %}
+                                            <td>{{ value }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                    {% if download_file %}
+                        <a href="{{ url_for('static', filename=download_file) }}" class="btn btn-success px-4 me-2" download>Download CSV Data</a>
+                    {% endif %}
+                    <a href="/dashboard" class="btn btn-outline-primary px-4">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

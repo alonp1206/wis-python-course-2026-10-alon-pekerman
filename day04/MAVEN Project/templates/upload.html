@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Step 1: Upload Data</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">Please upload your raw counts and metadata CSV files to begin the pipeline.</p>
+                <form action="/upload" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="counts_file" class="form-label fw-bold">Read Counts (CSV)</label>
+                        <input class="form-control" type="file" id="counts_file" name="counts_file" accept=".csv" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="meta_file" class="form-label fw-bold">Metadata / Design (CSV)</label>
+                        <input class="form-control" type="file" id="meta_file" name="meta_file" accept=".csv" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2">Upload & Continue</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

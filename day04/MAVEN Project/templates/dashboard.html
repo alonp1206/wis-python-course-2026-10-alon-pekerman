@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-12 text-center mb-5">
+        <h2 class="fw-bold">Analysis Dashboard</h2>
+        <p class="text-muted">Select an analysis module to run on your filtered dataset.</p>
+    </div>
+</div>
+<div class="row g-4">
+    <!-- PCA -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-info text-white fw-bold">PCA & Transformation</div>
+            <div class="card-body">
+                <p>Perform log-transformation and Principal Component Analysis.</p>
+                <a href="/run_pca" class="btn btn-outline-info w-100 mt-3">Run PCA</a>
+            </div>
+        </div>
+    </div>
+    <!-- DESeq2 -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-warning text-dark fw-bold">Differential Expression (DESeq2)</div>
+            <div class="card-body">
+                <form action="/run_deseq" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Condition Column</label>
+                        <select name="design_col" class="form-select">
+                            {% for col in columns %}
+                            <option value="{{ col }}">{{ col }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-warning w-100">Run DESeq2</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Clustering -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-primary text-white fw-bold">K-Means Clustering</div>
+            <div class="card-body">
+                <form action="/run_clustering" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Number of Clusters (k)</label>
+                        <input type="number" name="k_clusters" class="form-control" value="3" min="2" max="10">
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary w-100">Run Clustering</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Enrichment -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-success text-white fw-bold">Pathway Enrichment</div>
+            <div class="card-body">
+                <form action="/run_enrichment" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Database</label>
+                        <select name="database" class="form-select">
+                            <option value="KEGG_2021_Human">KEGG 2021 Human</option>
+                            <option value="GO_Biological_Process_2021">GO Biological Process</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-success w-100">Run Enrichment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
