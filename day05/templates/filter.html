@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-success text-white">
+                <h1 class="h5 mb-0">Step 2: Explore Low-Count Filtering</h1>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted">
+                    The histogram shows the distribution of each gene's Nth-highest raw count across samples.
+                    The curve shows how many genes pass each cutoff. Drag the highlighted point or type a value
+                    to choose the raw-count cutoff; changing N updates both plots.
+                    Preview: {{ gene_count }} genes across {{ sample_count }} matched samples.
+                </p>
+                {% if warnings %}
+                    {% for warning in warnings %}
+                        <div class="alert alert-warning">{{ warning }}</div>
+                    {% endfor %}
+                {% endif %}
+                <form action="{{ url_for('filter_page') }}" method="POST" id="filter-form" data-loading-message="Applying the gene filter…">
+                    <div class="row g-3 align-items-end mb-3">
+                        <div class="col-md-6">
+                            <label for="min_count" class="form-label fw-bold">Minimum raw reads per sample</label>
+                            <input type="number" class="form-control" id="min_count" name="min_count" value="10" min="0" step="1" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="min_samples" class="form-label fw-bold">Minimum number of samples (N)</label>
+                            <input type="number" class="form-control" id="min_samples" name="min_samples" value="{{ default_samples }}" min="1" max="{{ sample_count }}" step="1" required>
+                        </div>
+                    </div>
+                    <div class="border rounded bg-white p-3 mb-2" style="height: 400px;">
+                        <canvas id="filter-curve" aria-label="Histogram of per-gene sample counts and retained-gene cutoff curve" role="img"></canvas>
+                    </div>
+                    <p class="small text-muted mb-2">
+                        The cutoff statistic is the Nth-highest sample count for each gene, so a gene passes when
+                        it has at least the selected number of samples at or above the cutoff.
+                    </p>
+                    <p class="small text-muted" id="preview-status" aria-live="polite"></p>
+                    <p class="fw-semibold" id="retained-count" aria-live="polite"></p>
+                    <button type="submit" class="btn btn-success w-100 py-2">Apply Filter &amp; Continue</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+    const minCount = document.getElementById("min_count");
+    const minSamples = document.getElementById("min_samples");
+    const countLabel = document.getElementById("retained-count");
+    const status = document.getElementById("preview-status");
+    const canvas = document.getElementById("filter-curve");
+    const initial = {{ preview|tojson }};
+    let maxCount = initial.max_count;
+    let selectedGenes = initial.selected_genes;
+    let updateTimer;
+    let isDragging = false;
+    let previewController;
+
+    const chart = new Chart(canvas, {
+        type: "bar",
+        data: {
+            datasets: [
+                {
+                    type: "bar",
+                    label: "Genes in count range",
+                    data: initial.histogram.map(bin => ({
+                        x: bin.x,
+                        y: bin.y,
+                        bin_start: bin.bin_start,
+                        bin_end: bin.bin_end
+                    })),
+                    backgroundColor: "rgba(13, 110, 253, 0.3)",
+                    borderColor: "rgba(13, 110, 253, 0.65)",
+                    borderWidth: 1,
+                    barThickness: "flex",
+                    yAxisID: "yHistogram"
+                },
+                {
+                    type: "line",
+                    label: "Genes retained at or above cutoff",
+                    data: initial.curve.map(point => ({
+                        x: point.min_count,
+                        y: point.genes_retained
+                    })),
+                    borderColor: "#198754",
+                    backgroundColor: "#198754",
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    tension: 0.15,
+                    yAxisID: "yRetained"
+                },
+                {
+                    type: "scatter",
+                    label: "Selected cutoff (drag)",
+                    data: [{x: Number(minCount.value), y: selectedGenes}],
+                    pointRadius: 8,
+                    pointHoverRadius: 10,
+                    pointBackgroundColor: "#dc3545",
+                    pointBorderColor: "#ffffff",
+                    pointBorderWidth: 2,
+                    yAxisID: "yRetained"
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            parsing: false,
+            interaction: {mode: "nearest", intersect: true},
+            scales: {
+                x: {
+                    type: "linear",
+                    min: 0,
+                    max: maxCount,
+                    title: {display: true, text: "Nth-highest raw read count per gene"}
+                },
+                yHistogram: {
+                    beginAtZero: true,
+                    position: "left",
+                    title: {display: true, text: "Genes in histogram bin"}
+                },
+                yRetained: {
+                    beginAtZero: true,
+                    position: "right",
+                    grid: {drawOnChartArea: false},
+                    title: {display: true, text: "Genes retained"}
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            if (context.datasetIndex === 0) {
+                                const bin = context.raw;
+                                return `${context.dataset.label}: ${context.parsed.y} genes (${Math.round(bin.bin_start)}–${Math.round(bin.bin_end)} reads)`;
+                            }
+                            return `${context.dataset.label}: ${context.parsed.y} genes at cutoff ${Math.round(context.parsed.x)}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    function updateSelectedPoint(cutoff, retained) {
+        selectedGenes = retained;
+        chart.data.datasets[2].data = [{x: cutoff, y: retained}];
+        chart.update("none");
+        countLabel.textContent = `${retained.toLocaleString()} genes will be retained.`;
+        countLabel.className = "text-success fw-semibold";
+    }
+
+    function nearestRetainedCount(cutoff) {
+        const curve = chart.data.datasets[1].data;
+        let nearest = curve[0];
+        for (const point of curve) {
+            if (Math.abs(point.x - cutoff) < Math.abs(nearest.x - cutoff)) {
+                nearest = point;
+            }
+        }
+        return nearest.y;
+    }
+
+    async function updatePreview() {
+        if (!minCount.value || !minSamples.value) return;
+        const requestedMinCount = Number(minCount.value);
+        const requestedMinSamples = Number(minSamples.value);
+        status.textContent = "Updating histogram and cutoff curve…";
+        status.className = "small text-primary";
+        const query = new URLSearchParams({
+            min_count: minCount.value,
+            min_samples: minSamples.value
+        });
+        if (previewController) previewController.abort();
+        previewController = new AbortController();
+        try {
+            const response = await fetch(
+                `{{ url_for('filter_preview') }}?${query}`,
+                {signal: previewController.signal}
+            );
+            const result = await response.json();
+            if (
+                requestedMinCount !== Number(minCount.value) ||
+                requestedMinSamples !== Number(minSamples.value)
+            ) {
+                return;
+            }
+            if (!response.ok) {
+                status.textContent = result.error;
+                status.className = "small text-danger";
+                return;
+            }
+            maxCount = result.max_count;
+            chart.options.scales.x.max = maxCount;
+            chart.data.datasets[0].data = result.histogram.map(
+                bin => ({
+                    x: bin.x,
+                    y: bin.y,
+                    bin_start: bin.bin_start,
+                    bin_end: bin.bin_end
+                })
+            );
+            chart.data.datasets[1].data = result.curve.map(
+                point => ({x: point.min_count, y: point.genes_retained})
+            );
+            chart.data.datasets[2].data = [{
+                x: Number(minCount.value),
+                y: result.selected_genes
+            }];
+            chart.update();
+            selectedGenes = result.selected_genes;
+            countLabel.textContent = `${selectedGenes.toLocaleString()} genes will be retained.`;
+            countLabel.className = "text-success fw-semibold";
+            status.textContent = "";
+        } catch (error) {
+            if (error.name === "AbortError") return;
+            status.textContent = "Could not update the preview. Check your connection and try again.";
+            status.className = "small text-danger";
+        }
+    }
+
+    function scheduleUpdate() {
+        clearTimeout(updateTimer);
+        updateTimer = setTimeout(updatePreview, 180);
+    }
+
+    function relativePosition(event) {
+        return Chart.helpers.getRelativePosition(event, chart);
+    }
+
+    canvas.addEventListener("pointerdown", event => {
+        const dot = chart.getDatasetMeta(2).data[0];
+        if (!dot) return;
+        const position = relativePosition(event);
+        const point = dot.getProps(["x", "y"], true);
+        if (Math.hypot(position.x - point.x, position.y - point.y) <= 16) {
+            isDragging = true;
+            canvas.setPointerCapture(event.pointerId);
+            canvas.style.cursor = "grabbing";
+            event.preventDefault();
+        }
+    });
+
+    canvas.addEventListener("pointermove", event => {
+        const position = relativePosition(event);
+        if (isDragging) {
+            const cutoff = Math.max(
+                0,
+                Math.min(maxCount, Math.round(chart.scales.x.getValueForPixel(position.x)))
+            );
+            minCount.value = cutoff;
+            updateSelectedPoint(cutoff, nearestRetainedCount(cutoff));
+            return;
+        }
+        const dot = chart.getDatasetMeta(2).data[0];
+        const point = dot && dot.getProps(["x", "y"], true);
+        canvas.style.cursor = point &&
+            Math.hypot(position.x - point.x, position.y - point.y) <= 16
+            ? "grab"
+            : "default";
+    });
+
+    function finishDragging(event) {
+        if (!isDragging) return;
+        isDragging = false;
+        canvas.style.cursor = "grab";
+        if (canvas.hasPointerCapture(event.pointerId)) {
+            canvas.releasePointerCapture(event.pointerId);
+        }
+        scheduleUpdate();
+    }
+
+    canvas.addEventListener("pointerup", finishDragging);
+    canvas.addEventListener("pointercancel", finishDragging);
+    minCount.addEventListener("input", scheduleUpdate);
+    minSamples.addEventListener("input", scheduleUpdate);
+    updateSelectedPoint(Number(minCount.value), initial.selected_genes);
+})();
+</script>
+{% endblock %}

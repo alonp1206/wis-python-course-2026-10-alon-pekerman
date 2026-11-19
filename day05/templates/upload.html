@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white">
+                <h1 class="h5 mb-0">Step 1: Upload RNA-seq Data</h1>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">
+                    Upload a gene-by-sample table of raw integer counts and a sample metadata table.
+                    Sample IDs must match; unmatched samples are reported and excluded from analysis.
+                </p>
+                <form action="{{ url_for('upload_files') }}" method="POST" enctype="multipart/form-data" data-loading-message="Uploading and validating your files…">
+                    <div class="mb-3">
+                        <label for="counts_file" class="form-label fw-bold">Raw read counts (CSV)</label>
+                        <input class="form-control" type="file" id="counts_file" name="counts_file" accept=".csv" required>
+                        <div class="form-text">Rows are genes; columns after the first gene-ID column are samples. Repeated gene IDs are combined by summing their raw counts.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="meta_file" class="form-label fw-bold">Sample metadata (CSV)</label>
+                        <input class="form-control" type="file" id="meta_file" name="meta_file" accept=".csv" required>
+                        <div class="form-text">Rows are samples; the first column contains sample IDs.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2">Upload &amp; Continue</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

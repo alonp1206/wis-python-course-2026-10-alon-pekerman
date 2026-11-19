@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run MAVEN Flask app",
+			"type": "shell",
+			"command": "C:\\Users\\alon\\Desktop\\GIT\\wis-python-course-2026-10-alon-pekerman\\day04\\MAVEN Project\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import os; os.chdir(r'C:\\Users\\alon\\Desktop\\GIT\\wis-python-course-2026-10-alon-pekerman\\day04\\MAVEN Project'); import app; app.app.run(debug=False, port=5000)"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

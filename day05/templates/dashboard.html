@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-12 text-center mb-4">
+        <h1 class="h2 fw-bold">Analysis Dashboard</h1>
+        <p class="text-muted">Choose an analysis for the filtered raw-count data.</p>
+    </div>
+</div>
+{% if warnings %}
+    {% for warning in warnings %}
+        <div class="alert alert-warning">{{ warning }}</div>
+    {% endfor %}
+{% endif %}
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-info text-white fw-bold">PCA</div>
+            <div class="card-body">
+                <p>Analyze log2(CPM + 1) values for up to 1,000 most-variable genes.</p>
+                <form action="{{ url_for('do_pca') }}" method="GET" data-loading-message="Running PCA on normalized counts…">
+                    <label for="color_by" class="form-label">Color samples by metadata</label>
+                    <select id="color_by" name="color_by" class="form-select">
+                        <option value="">No grouping</option>
+                        {% for col in columns %}
+                            <option value="{{ col }}" {% if col == default_color %}selected{% endif %}>{{ col }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-outline-info w-100 mt-3">Run PCA</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-warning text-dark fw-bold">Differential Expression (DESeq2)</div>
+            <div class="card-body">
+                <form action="{{ url_for('do_deseq') }}" method="POST" data-loading-message="Running differential-expression analysis. This may take a few minutes…">
+                    <div class="mb-3">
+                        <label for="design_col" class="form-label">Condition column</label>
+                        <select id="design_col" name="design_col" class="form-select" required>
+                            {% for col in columns %}
+                                <option value="{{ col }}">{{ col }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="target_group" class="form-label">Target condition level</label>
+                        <select id="target_group" name="target_group" class="form-select" required></select>
+                    </div>
+                    <div class="mb-3" id="reference-group-container">
+                        <label for="reference_group" class="form-label">Reference / control group</label>
+                        <select id="reference_group" name="reference_group" class="form-select" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comparison_mode" class="form-label">Comparison</label>
+                        <select id="comparison_mode" name="comparison_mode" class="form-select">
+                            <option value="pairwise">Target level vs one reference level</option>
+                            <option value="one_vs_rest">Target level vs all other levels pooled</option>
+                        </select>
+                        <div class="form-text">The pooled reference combines samples from every other level in the selected condition column.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="lfc_threshold" class="form-label">Minimum absolute log2 fold change</label>
+                        <input id="lfc_threshold" name="lfc_threshold" type="number" class="form-control" value="1" min="0" step="0.1" required>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input id="label_top_genes" name="label_top_genes" type="checkbox" class="form-check-input">
+                        <label for="label_top_genes" class="form-check-label">Label the 10 most significant qualifying genes</label>
+                    </div>
+                    <p class="small text-muted">DEGs require padj &lt; 0.05 and the selected effect-size threshold.</p>
+                    <button type="submit" class="btn btn-outline-warning w-100">Run DESeq2 Contrast</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-primary text-white fw-bold">K-Means Clustering</div>
+            <div class="card-body">
+                <p>Cluster row-wise standardized log2(CPM + 1) profiles. Uses DEGs after a DESeq2 run; otherwise uses variable genes.</p>
+                <form action="{{ url_for('do_clustering') }}" method="POST" data-loading-message="Clustering gene expression patterns…">
+                    <label for="k_clusters" class="form-label">Number of clusters (k)</label>
+                    <input id="k_clusters" type="number" name="k_clusters" class="form-control" value="3" min="2" max="10" required>
+                    <button type="submit" class="btn btn-outline-primary w-100 mt-3">Run Clustering</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-header bg-success text-white fw-bold">Pathway Enrichment</div>
+            <div class="card-body">
+                <p>Enrichr over-representation analysis of significant DEGs, ranked by adjusted p-value.</p>
+                <form action="{{ url_for('do_enrichment') }}" method="POST" data-loading-message="Querying Enrichr and calculating pathway enrichment…">
+                    <div class="mb-3">
+                        <label for="database" class="form-label">Database</label>
+                        <select id="database" name="database" class="form-select">
+                            <option value="KEGG_2021_Human">KEGG 2021 Human</option>
+                            <option value="GO_Biological_Process_2021">GO Biological Process 2021</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="direction" class="form-label">Gene direction</label>
+                        <select id="direction" name="direction" class="form-select">
+                            <option value="combined">Combined</option>
+                            <option value="up">Upregulated</option>
+                            <option value="down">Downregulated</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-success w-100">Run Enrichment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const levels = {{ metadata_levels|tojson }};
+    const design = document.getElementById("design_col");
+    const target = document.getElementById("target_group");
+    const reference = document.getElementById("reference_group");
+    const comparisonMode = document.getElementById("comparison_mode");
+    const referenceContainer = document.getElementById("reference-group-container");
+
+    function updateComparisonMode() {
+        const isOneVsRest = comparisonMode.value === "one_vs_rest";
+        referenceContainer.hidden = isOneVsRest;
+        reference.disabled = isOneVsRest;
+        reference.required = !isOneVsRest;
+    }
+
+    function updateGroups() {
+        const groups = levels[design.value] || [];
+        for (const select of [target, reference]) {
+            select.replaceChildren(new Option("Select a group", ""));
+            for (const group of groups) {
+                select.add(new Option(group, group));
+            }
+        }
+        if (groups.length > 0) target.value = groups[0];
+        if (groups.length > 1) reference.value = groups[1];
+    }
+
+    design.addEventListener("change", updateGroups);
+    comparisonMode.addEventListener("change", updateComparisonMode);
+    updateGroups();
+    updateComparisonMode();
+})();
+</script>
+{% endblock %}
