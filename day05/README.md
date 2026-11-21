@@ -20,6 +20,12 @@ Open <http://127.0.0.1:5000>. The secret key is required and should remain
 private. This app uses Flask's development server; keep it on a trusted local
 machine.
 
+Run the project workflow and input-validation tests from this directory:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
 Upload a gene-by-sample CSV of non-negative integer raw counts and a
 sample-by-metadata CSV. Repeated identical gene IDs in the count file are
 combined by summing their raw counts per sample. Filter genes by a minimum
