@@ -10,9 +10,9 @@
             <div class="card-body p-4">
                 <p class="text-muted">
                     The histogram shows the distribution of each gene's Nth-highest raw count across samples.
-                    The curve shows how many genes pass each cutoff. Drag the highlighted point or type a value
-                    to choose the raw-count cutoff; changing N updates both plots.
-                    Preview: {{ gene_count }} genes across {{ sample_count }} matched samples.
+                    The curve shows the percentage of genes remaining at each cutoff. The read-count axis is
+                    logarithmic. Drag the highlighted point or type a value to choose the raw-count cutoff;
+                    changing N updates both plots. Preview: {{ sample_count }} matched samples.
                 </p>
                 {% if warnings %}
                     {% for warning in warnings %}
@@ -38,7 +38,7 @@
                         it has at least the selected number of samples at or above the cutoff.
                     </p>
                     <p class="small text-muted" id="preview-status" aria-live="polite"></p>
-                    <p class="fw-semibold" id="retained-count" aria-live="polite"></p>
+                    <p class="fw-semibold" id="retained-percent" aria-live="polite"></p>
                     <button type="submit" class="btn btn-success w-100 py-2">Apply Filter &amp; Continue</button>
                 </form>
             </div>
@@ -53,15 +53,17 @@
 (() => {
     const minCount = document.getElementById("min_count");
     const minSamples = document.getElementById("min_samples");
-    const countLabel = document.getElementById("retained-count");
+    const percentLabel = document.getElementById("retained-percent");
     const status = document.getElementById("preview-status");
     const canvas = document.getElementById("filter-curve");
     const initial = {{ preview|tojson }};
     let maxCount = initial.max_count;
-    let selectedGenes = initial.selected_genes;
+    let selectedPercent = initial.selected_percent;
     let updateTimer;
     let isDragging = false;
     let previewController;
+    const toLogReads = reads => Math.log10(Number(reads) + 1);
+    const fromLogReads = value => Math.max(0, Math.round(Math.pow(10, value) - 1));
 
     const chart = new Chart(canvas, {
         type: "bar",
@@ -69,9 +71,9 @@
             datasets: [
                 {
                     type: "bar",
-                    label: "Genes in count range",
+                    label: "Genes per read-count bin (%)",
                     data: initial.histogram.map(bin => ({
-                        x: bin.x,
+                        x: toLogReads(bin.x),
                         y: bin.y,
                         bin_start: bin.bin_start,
                         bin_end: bin.bin_end
@@ -80,32 +82,32 @@
                     borderColor: "rgba(13, 110, 253, 0.65)",
                     borderWidth: 1,
                     barThickness: "flex",
-                    yAxisID: "yHistogram"
+                    yAxisID: "y"
                 },
                 {
                     type: "line",
-                    label: "Genes retained at or above cutoff",
+                    label: "Genes remaining (%)",
                     data: initial.curve.map(point => ({
-                        x: point.min_count,
-                        y: point.genes_retained
+                        x: toLogReads(point.min_count),
+                        y: point.genes_retained_percent
                     })),
                     borderColor: "#198754",
                     backgroundColor: "#198754",
                     pointRadius: 0,
                     borderWidth: 2,
                     tension: 0.15,
-                    yAxisID: "yRetained"
+                    yAxisID: "y"
                 },
                 {
                     type: "scatter",
                     label: "Selected cutoff (drag)",
-                    data: [{x: Number(minCount.value), y: selectedGenes}],
+                    data: [{x: toLogReads(minCount.value), y: selectedPercent}],
                     pointRadius: 8,
                     pointHoverRadius: 10,
                     pointBackgroundColor: "#dc3545",
                     pointBorderColor: "#ffffff",
                     pointBorderWidth: 2,
-                    yAxisID: "yRetained"
+                    yAxisID: "y"
                 }
             ]
         },
@@ -118,19 +120,23 @@
                 x: {
                     type: "linear",
                     min: 0,
-                    max: maxCount,
-                    title: {display: true, text: "Nth-highest raw read count per gene"}
+                    max: toLogReads(maxCount),
+                    title: {display: true, text: "Nth-highest raw reads per gene (log scale)"},
+                    ticks: {
+                        callback(value) {
+                            return fromLogReads(value).toLocaleString();
+                        }
+                    }
                 },
-                yHistogram: {
-                    beginAtZero: true,
-                    position: "left",
-                    title: {display: true, text: "Genes in histogram bin"}
-                },
-                yRetained: {
-                    beginAtZero: true,
-                    position: "right",
-                    grid: {drawOnChartArea: false},
-                    title: {display: true, text: "Genes retained"}
+                y: {
+                    min: 0,
+                    max: 100,
+                    title: {display: true, text: "Genes (%)"},
+                    ticks: {
+                        callback(value) {
+                            return `${value}%`;
+                        }
+                    }
                 }
             },
             plugins: {
@@ -139,9 +145,9 @@
                         label(context) {
                             if (context.datasetIndex === 0) {
                                 const bin = context.raw;
-                                return `${context.dataset.label}: ${context.parsed.y} genes (${Math.round(bin.bin_start)}–${Math.round(bin.bin_end)} reads)`;
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}% (${Math.round(bin.bin_start)}–${Math.round(bin.bin_end)} reads)`;
                             }
-                            return `${context.dataset.label}: ${context.parsed.y} genes at cutoff ${Math.round(context.parsed.x)}`;
+                            return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}% at cutoff ${fromLogReads(context.parsed.x).toLocaleString()} reads`;
                         }
                     }
                 }
@@ -149,19 +155,19 @@
         }
     });
 
-    function updateSelectedPoint(cutoff, retained) {
-        selectedGenes = retained;
-        chart.data.datasets[2].data = [{x: cutoff, y: retained}];
+    function updateSelectedPoint(cutoff, retainedPercent) {
+        selectedPercent = retainedPercent;
+        chart.data.datasets[2].data = [{x: toLogReads(cutoff), y: retainedPercent}];
         chart.update("none");
-        countLabel.textContent = `${retained.toLocaleString()} genes will be retained.`;
-        countLabel.className = "text-success fw-semibold";
+        percentLabel.textContent = `${retainedPercent.toFixed(1)}% of genes will remain after filtering.`;
+        percentLabel.className = "text-success fw-semibold";
     }
 
-    function nearestRetainedCount(cutoff) {
+    function nearestRetainedPercent(cutoff) {
         const curve = chart.data.datasets[1].data;
         let nearest = curve[0];
         for (const point of curve) {
-            if (Math.abs(point.x - cutoff) < Math.abs(nearest.x - cutoff)) {
+            if (Math.abs(point.x - toLogReads(cutoff)) < Math.abs(nearest.x - toLogReads(cutoff))) {
                 nearest = point;
             }
         }
@@ -198,26 +204,29 @@
                 return;
             }
             maxCount = result.max_count;
-            chart.options.scales.x.max = maxCount;
+            chart.options.scales.x.max = toLogReads(maxCount);
             chart.data.datasets[0].data = result.histogram.map(
                 bin => ({
-                    x: bin.x,
+                    x: toLogReads(bin.x),
                     y: bin.y,
                     bin_start: bin.bin_start,
                     bin_end: bin.bin_end
                 })
             );
             chart.data.datasets[1].data = result.curve.map(
-                point => ({x: point.min_count, y: point.genes_retained})
+                point => ({
+                    x: toLogReads(point.min_count),
+                    y: point.genes_retained_percent
+                })
             );
             chart.data.datasets[2].data = [{
-                x: Number(minCount.value),
-                y: result.selected_genes
+                x: toLogReads(minCount.value),
+                y: result.selected_percent
             }];
             chart.update();
-            selectedGenes = result.selected_genes;
-            countLabel.textContent = `${selectedGenes.toLocaleString()} genes will be retained.`;
-            countLabel.className = "text-success fw-semibold";
+            selectedPercent = result.selected_percent;
+            percentLabel.textContent = `${selectedPercent.toFixed(1)}% of genes will remain after filtering.`;
+            percentLabel.className = "text-success fw-semibold";
             status.textContent = "";
         } catch (error) {
             if (error.name === "AbortError") return;
@@ -253,10 +262,13 @@
         if (isDragging) {
             const cutoff = Math.max(
                 0,
-                Math.min(maxCount, Math.round(chart.scales.x.getValueForPixel(position.x)))
+                Math.min(
+                    maxCount,
+                    fromLogReads(chart.scales.x.getValueForPixel(position.x))
+                )
             );
             minCount.value = cutoff;
-            updateSelectedPoint(cutoff, nearestRetainedCount(cutoff));
+            updateSelectedPoint(cutoff, nearestRetainedPercent(cutoff));
             return;
         }
         const dot = chart.getDatasetMeta(2).data[0];
@@ -281,7 +293,7 @@
     canvas.addEventListener("pointercancel", finishDragging);
     minCount.addEventListener("input", scheduleUpdate);
     minSamples.addEventListener("input", scheduleUpdate);
-    updateSelectedPoint(Number(minCount.value), initial.selected_genes);
+    updateSelectedPoint(Number(minCount.value), initial.selected_percent);
 })();
 </script>
 {% endblock %}

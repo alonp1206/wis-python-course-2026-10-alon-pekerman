@@ -24,9 +24,11 @@ Upload a gene-by-sample CSV of non-negative integer raw counts and a
 sample-by-metadata CSV. Repeated identical gene IDs in the count file are
 combined by summing their raw counts per sample. Filter genes by a minimum
 read count in a minimum number of samples using the interactive histogram and
-draggable retained-gene cutoff. DESeq2 supports pairwise and selected-level
-versus pooled-rest comparisons. For CSV formats, workflow details, thresholds,
-session storage, and troubleshooting, see the [User Guide](./USER_GUIDE.md).
+draggable retained-gene cutoff; the chart uses a logarithmic read-count axis
+and percentages of genes. PCA includes all filtered genes. DESeq2 supports
+pairwise and selected-level versus pooled-rest comparisons and uses up to four
+CPU cores for fitting. For CSV formats, workflow details, thresholds, session
+storage, and troubleshooting, see the [User Guide](./USER_GUIDE.md).
 
 ## Project files
 

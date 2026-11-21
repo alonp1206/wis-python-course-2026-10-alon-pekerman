@@ -203,7 +203,6 @@ def filter_page():
         return render_template(
             "filter.html",
             sample_count=len(counts_df.columns),
-            gene_count=len(counts_df),
             default_samples=default_samples,
             preview=preview,
             warnings=warnings,

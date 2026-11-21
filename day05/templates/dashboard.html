@@ -16,7 +16,7 @@
         <div class="card shadow-sm h-100 border-0">
             <div class="card-header bg-info text-white fw-bold">PCA</div>
             <div class="card-body">
-                <p>Analyze log2(CPM + 1) values for up to 1,000 most-variable genes.</p>
+                <p>Analyze log2(CPM + 1) values for all genes retained by the filter.</p>
                 <form action="{{ url_for('do_pca') }}" method="GET" data-loading-message="Running PCA on normalized counts…">
                     <label for="color_by" class="form-label">Color samples by metadata</label>
                     <select id="color_by" name="color_by" class="form-select">
@@ -34,7 +34,7 @@
         <div class="card shadow-sm h-100 border-0">
             <div class="card-header bg-warning text-dark fw-bold">Differential Expression (DESeq2)</div>
             <div class="card-body">
-                <form action="{{ url_for('do_deseq') }}" method="POST" data-loading-message="Running differential-expression analysis. This may take a few minutes…">
+                <form action="{{ url_for('do_deseq') }}" method="POST" data-loading-message="Running DESeq2 with up to 4 CPU cores. This may take a few minutes…">
                     <div class="mb-3">
                         <label for="design_col" class="form-label">Condition column</label>
                         <select id="design_col" name="design_col" class="form-select" required>
@@ -68,6 +68,7 @@
                         <label for="label_top_genes" class="form-check-label">Label the 10 most significant qualifying genes</label>
                     </div>
                     <p class="small text-muted">DEGs require padj &lt; 0.05 and the selected effect-size threshold.</p>
+                    <p class="small text-muted">PyDESeq2 uses up to 4 available CPU cores to speed up fitting without dropping genes.</p>
                     <button type="submit" class="btn btn-outline-warning w-100">Run DESeq2 Contrast</button>
                 </form>
             </div>

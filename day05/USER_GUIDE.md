@@ -76,8 +76,9 @@ different genes that happen to share a symbol will also be combined.
 
 Upload the count and metadata tables. The filter page displays an interactive
 histogram and retained-gene curve. The histogram shows the distribution of
-each gene's Nth-highest raw count across samples; the curve shows the number
-of genes retained as the cutoff increases. Set:
+each gene's Nth-highest raw count across samples on a logarithmic read-count
+axis; the histogram and curve show percentages rather than gene totals. The
+curve shows the percentage of genes remaining as the cutoff increases. Set:
 
 - **Minimum raw reads per sample** (`min_count`; default `10`).
 - **Minimum number of samples** (`N`; default `2`, capped at the available
@@ -86,18 +87,18 @@ of genes retained as the cutoff increases. Set:
 A gene is retained if its raw count is at least `min_count` in at least `N`
 matched samples. Drag the highlighted point along the retained-gene curve to
 set the cutoff, or type the cutoff directly; changing either value updates
-the plot and retained-gene count before applying the filter. Filtering uses
-the matched sample columns. Revisit the filter step to change the thresholds;
-doing so invalidates previous DESeq2 and clustering-download state.
+the plot and remaining-gene percentage before applying the filter. Filtering
+uses the matched sample columns. Revisit the filter step to change the
+thresholds; doing so invalidates previous DESeq2 and clustering-download state.
 
 ### 2. PCA
 
 Choose a metadata column to color samples (default: `Lineage`, when present)
 or choose **No grouping**. PCA uses log2(CPM + 1), where each sample is
-normalized by its total library size, and the top 1,000 variable genes (or
-fewer if fewer are available). Points are labeled with sample IDs and a
-legend identifies the selected groups. PCA is a descriptive visualization,
-not a differential-expression test.
+normalized by its total library size, and includes all genes remaining after
+filtering. Points are labeled with sample IDs and a legend identifies the
+selected groups. PCA is a descriptive visualization, not a
+differential-expression test.
 
 ### 3. Differential expression with DESeq2
 
@@ -118,7 +119,9 @@ The volcano plot shows upregulated genes in red, downregulated genes in blue,
 and other genes in gray, with effect-size and adjusted-p-value threshold
 lines. Optionally label the ten most significant qualifying genes.
 Cook's-distance filtering is retained; count refitting of outliers is disabled
-for compatibility with the pinned PyDESeq2/AnnData versions.
+for compatibility with the pinned PyDESeq2/AnnData versions. The fit and
+statistical-results steps use up to four available CPU cores; this parallelism
+does not drop genes or change the analysis thresholds.
 
 Analysis forms display an indeterminate progress bar and a wait message while
 uploads, filtering, PCA, DESeq2, clustering, or enrichment are running; actual
@@ -161,7 +164,7 @@ are no longer needed. Do not delete files while an analysis is running.
 
 - **Input errors:** Check the first-column IDs, unique sample identifiers, raw
   integer counts, CSV encoding, and matched sample names.
-- **PCA errors:** At least two samples and two variable genes are needed.
+- **PCA errors:** At least two samples and two varying genes are needed.
   Remove zero-library samples and inspect the filtered data if CPM cannot be
   calculated.
 - **DESeq2 errors:** Confirm both groups have at least two samples and that

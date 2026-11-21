@@ -98,8 +98,11 @@ def filter_preview_data(counts_df, min_samples=2, selected_min_count=10, bins=50
     ]
     max_count = max(int(nth_largest.max(initial=0)), selected_min_count, 1)
     upper = max(100, max_count)
-    bin_edges = np.linspace(0, upper, num=bins + 1)
+    bin_edges = np.expm1(np.linspace(0, np.log10(upper + 1), num=bins + 1))
+    bin_edges[0] = 0
+    bin_edges[-1] = np.nextafter(float(upper), np.inf)
     histogram_counts, _ = np.histogram(nth_largest, bins=bin_edges)
+    total_genes = len(nth_largest)
     thresholds = np.unique(
         np.append(np.linspace(0, upper, num=101, dtype=int), selected_min_count)
     )
@@ -107,8 +110,8 @@ def filter_preview_data(counts_df, min_samples=2, selected_min_count=10, bins=50
     return {
         "histogram": [
             {
-                "x": float((left + right) / 2),
-                "y": int(count),
+                "x": float(np.sqrt((left + 1) * (right + 1)) - 1),
+                "y": float(count * 100 / total_genes),
                 "bin_start": float(left),
                 "bin_end": float(right),
             }
@@ -117,11 +120,16 @@ def filter_preview_data(counts_df, min_samples=2, selected_min_count=10, bins=50
             )
         ],
         "curve": [
-            {"min_count": int(threshold), "genes_retained": count}
+            {
+                "min_count": int(threshold),
+                "genes_retained_percent": float(count * 100 / total_genes),
+            }
             for threshold, count in zip(thresholds, retained)
         ],
         "max_count": upper,
-        "selected_genes": int(np.count_nonzero(nth_largest >= selected_min_count)),
+        "selected_percent": float(
+            np.count_nonzero(nth_largest >= selected_min_count) * 100 / total_genes
+        ),
     }
 
 
@@ -138,17 +146,17 @@ def run_pca_analysis(
     meta_df=None,
     color_by=None,
     output_dir="static",
-    n_top_genes=1000,
 ):
     if counts_df.shape[1] < 2:
         raise ValueError("PCA requires at least two samples.")
     log_counts = _log_cpm(counts_df)
-    variable_genes = _top_variable_genes(log_counts, max_genes=n_top_genes)
-    if len(variable_genes) < 2:
-        raise ValueError("PCA requires at least two variable genes.")
+    if len(log_counts) < 2:
+        raise ValueError("PCA requires at least two genes.")
+    if (log_counts.var(axis=1, ddof=0) > 0).sum() < 2:
+        raise ValueError("PCA requires at least two genes with variation across samples.")
 
     pca = PCA(n_components=2)
-    components = pca.fit_transform(log_counts.loc[variable_genes].T)
+    components = pca.fit_transform(log_counts.T)
     fig, ax = plt.subplots(figsize=(10, 7))
 
     if color_by:
@@ -182,7 +190,7 @@ def run_pca_analysis(
                 alpha=0.7,
             )
 
-    ax.set_title(f"PCA of log2(CPM + 1), top {len(variable_genes)} variable genes")
+    ax.set_title(f"PCA of log2(CPM + 1), all {len(log_counts)} filtered genes")
     ax.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0] * 100:.1f}%)")
     ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1] * 100:.1f}%)")
     fig.tight_layout()
@@ -287,10 +295,12 @@ def run_deseq2(
     os.makedirs(output_dir, exist_ok=True)
     results_dir = results_dir or output_dir
     os.makedirs(results_dir, exist_ok=True)
+    n_cpus = min(4, os.cpu_count() or 1)
     dds = DeseqDataSet(
         counts=counts_df.T,
         metadata=metadata,
         design_factors=model_design_col,
+        n_cpus=n_cpus,
         # Cook's filtering remains enabled in DeseqStats; this avoids the
         # incompatible outlier-refit path in the pinned PyDESeq2/AnnData stack.
         refit_cooks=False,
@@ -301,6 +311,7 @@ def run_deseq2(
         dds,
         contrast=[model_design_col, model_target_group, model_reference_group],
         alpha=padj_threshold,
+        n_cpus=n_cpus,
         quiet=True,
     )
     with contextlib.redirect_stdout(io.StringIO()):
