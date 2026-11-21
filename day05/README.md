@@ -27,8 +27,9 @@ read count in a minimum number of samples using the interactive histogram and
 draggable retained-gene cutoff; the chart uses a logarithmic read-count axis
 and percentages of genes. PCA includes all filtered genes. DESeq2 supports
 pairwise and selected-level versus pooled-rest comparisons and uses up to four
-CPU cores for fitting. For CSV formats, workflow details, thresholds, session
-storage, and troubleshooting, see the [User Guide](./USER_GUIDE.md).
+CPU cores for larger fits while avoiding parallel startup overhead on small
+inputs. For CSV formats, workflow details, thresholds, session storage, and
+troubleshooting, see the [User Guide](./USER_GUIDE.md).
 
 ## Project files
 

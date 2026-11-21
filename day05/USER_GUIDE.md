@@ -119,9 +119,11 @@ The volcano plot shows upregulated genes in red, downregulated genes in blue,
 and other genes in gray, with effect-size and adjusted-p-value threshold
 lines. Optionally label the ten most significant qualifying genes.
 Cook's-distance filtering is retained; count refitting of outliers is disabled
-for compatibility with the pinned PyDESeq2/AnnData versions. The fit and
-statistical-results steps use up to four available CPU cores; this parallelism
-does not drop genes or change the analysis thresholds.
+for compatibility with the pinned PyDESeq2/AnnData versions. Worker count
+scales with the filtered gene count (one worker per 5,000 genes, capped at four
+and by available CPUs). Small jobs stay single-worker to avoid multiprocessing
+startup overhead. This parallelism does not drop genes or change the analysis
+thresholds.
 
 Analysis forms display an indeterminate progress bar and a wait message while
 uploads, filtering, PCA, DESeq2, clustering, or enrichment are running; actual

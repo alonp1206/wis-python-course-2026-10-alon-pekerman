@@ -295,7 +295,7 @@ def run_deseq2(
     os.makedirs(output_dir, exist_ok=True)
     results_dir = results_dir or output_dir
     os.makedirs(results_dir, exist_ok=True)
-    n_cpus = min(4, os.cpu_count() or 1)
+    n_cpus = min(4, os.cpu_count() or 1, max(1, counts_df.shape[0] // 5000))
     dds = DeseqDataSet(
         counts=counts_df.T,
         metadata=metadata,
